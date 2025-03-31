@@ -4,26 +4,39 @@
 
 #define LED_GPIO_1 2  // LED 1 GPIO
 #define LED_GPIO_2 5  // LED 2 GPIO
-#define FADE_TIME_1 100
-#define FADE_TIME_2 2000
+#define LED_GPIO_3 19  // LED 3 GPIO
+#define FADE_TIME_1 500
+#define FADE_TIME_2 1000
+#define FADE_TIME_3 3000
 
 void fade_led_task(void *pvParameters) {
     int channel = (int)pvParameters;
 
-    while (1) {
-        // Fade In
-        ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, channel, 1023, 
-                                     (channel == LEDC_CHANNEL_0) ? FADE_TIME_1 : FADE_TIME_2, 
-                                     LEDC_FADE_NO_WAIT);
-        vTaskDelay(pdMS_TO_TICKS((channel == LEDC_CHANNEL_0) ? FADE_TIME_1 : FADE_TIME_2));
+    int fade_time;
 
-        // Fade Out
-        ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, channel, 0, 
-                                     (channel == LEDC_CHANNEL_0) ? FADE_TIME_1 : FADE_TIME_2, 
-                                     LEDC_FADE_NO_WAIT);
-        vTaskDelay(pdMS_TO_TICKS((channel == LEDC_CHANNEL_0) ? FADE_TIME_1 : FADE_TIME_2));
+    switch (channel) {
+        case LEDC_CHANNEL_0:
+            fade_time = FADE_TIME_1;
+            break;
+        case LEDC_CHANNEL_1:
+            fade_time = FADE_TIME_2;
+            break;
+        case LEDC_CHANNEL_2:
+            fade_time = FADE_TIME_3;  // Example fade time for third
+	    break;
+        default:
+            fade_time = 1000;  // Default fade time
+            break;
     }
-}
+
+    while (1) {
+        ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, channel, 1023, fade_time, LEDC_FADE_NO_WAIT);
+        vTaskDelay(pdMS_TO_TICKS(fade_time));
+
+        ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, channel, 0, fade_time, LEDC_FADE_NO_WAIT);
+        vTaskDelay(pdMS_TO_TICKS(fade_time));
+    }
+    }
 
 void app_main() {
     // Configure LEDC Timer
@@ -55,10 +68,20 @@ void app_main() {
             .gpio_num = LED_GPIO_2,
             .duty = 0,
             .hpoint = 0
-        }
+	},
+
+	{
+            .speed_mode = LEDC_LOW_SPEED_MODE,
+            .channel = LEDC_CHANNEL_2,
+            .timer_sel = LEDC_TIMER_0,
+            .intr_type = LEDC_INTR_DISABLE,
+            .gpio_num = LED_GPIO_3,
+            .duty = 0,
+            .hpoint = 0
+        },
     };
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
         ledc_channel_config(&ledc_channel[i]);
     }
 
@@ -68,6 +91,7 @@ void app_main() {
     // Create separate tasks for each LED channel
     xTaskCreate(fade_led_task, "fade_led_0", 2048, (void *)LEDC_CHANNEL_0, 1, NULL);
     xTaskCreate(fade_led_task, "fade_led_1", 2048, (void *)LEDC_CHANNEL_1, 1, NULL);
+    xTaskCreate(fade_led_task, "fade_led_2", 2048, (void *)LEDC_CHANNEL_2, 1, NULL);
 }
 
 
